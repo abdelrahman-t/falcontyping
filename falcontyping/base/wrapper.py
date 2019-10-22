@@ -9,7 +9,7 @@ from .resource import TypedResource
 from .utils import patch_resource_methods
 
 
-class TypedAPI(wrapt.ObjectProxy):
+class TypedAPI(wrapt.CallableObjectProxy):
     """Transparent proxy over falcon.API."""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
@@ -28,6 +28,3 @@ class TypedAPI(wrapt.ObjectProxy):
             patch_resource_methods(uri_template, resource)
 
         return self.__wrapped__.add_route(uri_template, resource, **kwargs)
-
-    def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        return self.__wrapped__.__call__(*args, **kwargs)
