@@ -1,5 +1,9 @@
 # Falcon typing
 
+![PyPI - Python Version](https://img.shields.io/pypi/pyversions/falcontyping)
+![PyPI](https://img.shields.io/pypi/v/falcontyping)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 ### Use type hints to specify request parameters with Marshmallow and Pydantic support.
 Uses [typedjson](https://github.com/mitsuse/typedjson-python)
 
