@@ -2,3 +2,5 @@ venv
 *cache*
 dist
 .vscode
+build
+MANIFEST

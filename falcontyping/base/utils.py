@@ -1,6 +1,7 @@
 """Utilities."""
 import itertools
 import re
+from functools import partial
 from typing import Any, Callable, List, Optional, Set, Union, get_type_hints
 
 import falcon
@@ -69,22 +70,20 @@ def validate_type_preconditions(type_: Any) -> None:
 
     def predicate(type_: Any) -> bool:
         """Check if type can be used in the body of the request or response."""
-        has_supported_parent = any(
-            issubclass(type_, parent) for parent in _AVAILABLE_EXTERNAL_SCHEMA_PRODIVERS
-        )
-        return (has_supported_parent or type_ is None) and type_ is not Any
-
-    try:
         origin, args = origin_of(type_), args_of(type_)
 
         if origin is Union:
-            types = args
+            return all(predicate(arg) for arg in args)
 
         else:
-            types = (origin or type_, )
+            has_supported_parent = any(
+                issubclass(type_, parent) for parent in _AVAILABLE_EXTERNAL_SCHEMA_PRODIVERS
+            )
+            return (has_supported_parent or type_ == type(None)) and type_ is not Any  # noqa
 
-        for incompatible_type in itertools.filterfalse(predicate, types):
-            raise TypeValidationError(error.format(incompatible_type))
+    try:
+        if not predicate(type_):
+            raise TypeValidationError(error.format(type_))
 
     except TypeError:
         raise TypeValidationError(error.format(type_))
@@ -134,9 +133,12 @@ def patch_resource_methods(uri_template: str, resource: Any) -> None:
         return curried  # type: ignore
 
     resource.methods_body_parameters = {}
+    for method_name in filter(partial(hasattr, resource), _METHOD_NAMES):
 
-    for method_name in filter(resource.__dict__.get, _METHOD_NAMES):
         method: ResourceMethodWithReturnValue = getattr(resource, method_name)
+
+        if not callable(method):
+            raise TypeValidationError(f'{resource}.{method_name} must be a Callable')
 
         try:
             resource.methods_body_parameters[method_name] = validate_method_signature(method,
@@ -148,6 +150,7 @@ def patch_resource_methods(uri_template: str, resource: Any) -> None:
         wrapped = resource_method_wrapper(method)
 
         # Preserve documentation and annotations
+        wrapped.__name__ = method.__name__  # type: ignore
         wrapped.__doc__ = method.__doc__
         wrapped.__annotations__ = method.__annotations__
 

@@ -125,9 +125,7 @@ def decode_as_model(type_: Type[Decoded], json: Any, path: Path) -> Union[Decode
 
 
 def decode_as_primitive(type_: Type[Decoded], json: Any, path: Path) -> Union[Decoded, DecodingError]:
-    from .annotation import origin_of
-
-    if origin_of(type_) in (Union, Any, ) or type_ not in _PRIMITIVE_TYPES:
+    if type_ not in _PRIMITIVE_TYPES:
         return DecodingError(UnsupportedDecoding(path))
 
     if isinstance(json, type_):
