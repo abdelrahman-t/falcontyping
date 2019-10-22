@@ -8,7 +8,7 @@
 Uses [typedjson](https://github.com/mitsuse/typedjson-python)
 
 ### Example
-```
+```python
 """API."""
 from typing import Union
 
