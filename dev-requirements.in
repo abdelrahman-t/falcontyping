@@ -1,0 +1,14 @@
+-c requirements.txt
+
+mypy
+pylint
+flake8
+pydocstyle
+
+isort
+autopep8
+
+bandit
+
+pydantic
+marshmallow
