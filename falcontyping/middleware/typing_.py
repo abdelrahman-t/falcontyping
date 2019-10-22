@@ -120,7 +120,7 @@ class TypingMiddleware:
                 ...
 
             else:
-                if type(media) not in _VALID_RESPONSE_TYPES:
+                if not any(isinstance(media, type_) for type_ in _VALID_RESPONSE_TYPES):
                     raise TypeValidationError(f'{resource}.{handler} returned a unexpected value. ',
                                               f'Resource methods must return either Nothing, '
                                               f'marshmallow.Schema or pydantic.BaseModel not {type(media)}')
@@ -129,14 +129,14 @@ class TypingMiddleware:
                     if isinstance(media, dict):
                         ...
 
-                    elif issubclass(media, PydanticBaseModel):
+                    elif isinstance(media, PydanticBaseModel):
                         media = media.dict()
 
-                    elif issubclass(media, MarshmallowSchema):
+                    elif isinstance(media, MarshmallowSchema):
                         media = hint().dump(media)
 
                     response.media = media
 
                 except Exception:
-                    raise TypeValidationError(f'{resource}.{handler} failed to serialize {media}:{type(media)} to JSON.'
-                                              f'A "dict()" method must be present for non-standard types')
+                    raise TypeValidationError(f'{resource}.{handler} '
+                                              f'failed to serialize {media}:{type(media)} to JSON.')

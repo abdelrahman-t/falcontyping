@@ -2,30 +2,32 @@
 from typing import Any
 
 import falcon
+import wrapt
 
+from ..middleware import TypingMiddleware
 from .resource import TypedResource
 from .utils import patch_resource_methods
 
 
-class TypedAPI:
-    """
-    Transparent proxy over falcon.API.
+class TypedAPI(wrapt.ObjectProxy):
+    """Transparent proxy over falcon.API."""
 
-    Proxy adds a verification step which is applied before calls to falcon.API.add_route()
-    """
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        middleware = kwargs.get('middleware', [])
 
-    def __init__(self, api: falcon.API) -> None:
-        self.api = api
+        if not any(isinstance(m, TypingMiddleware) for m in middleware):
+            kwargs = {**kwargs, 'middleware': middleware + [TypingMiddleware()]}
+
+        super().__init__(
+            falcon.API(*args, **kwargs)
+        )
 
     def add_route(self, uri_template: str, resource: Any, **kwargs: Any) -> Any:
-        """Verify method signature for typed resources."""
+        """Extract type hints information before adding route."""
         if isinstance(resource, TypedResource):
             patch_resource_methods(uri_template, resource)
 
-        return self.api.add_route(uri_template, resource, **kwargs)
-
-    def __getattr__(self, name: str) -> Any:
-        return getattr(self.api, name)
+        return self.__wrapped__.add_route(uri_template, resource, **kwargs)
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        return self.api.__call__(*args, **kwargs)
+        return self.__wrapped__.__call__(*args, **kwargs)

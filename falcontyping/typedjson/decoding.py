@@ -106,6 +106,9 @@ def decode_as_model(type_: Type[Decoded], json: Any, path: Path) -> Union[Decode
     if origin_of(type_) in (Union, Any, ):
         return DecodingError(UnsupportedDecoding(path))
 
+    if isinstance(json, type_):
+        return json
+
     if PydanticBaseModel and issubclass(type_, PydanticBaseModel):
         if json:
             return parse_pydantic_from_dict(type_, json=json, path=path)

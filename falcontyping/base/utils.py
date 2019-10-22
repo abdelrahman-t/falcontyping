@@ -1,4 +1,5 @@
 """Utilities."""
+import inspect
 import itertools
 import re
 from functools import partial
@@ -89,9 +90,9 @@ def validate_type_preconditions(type_: Any) -> None:
         raise TypeValidationError(error.format(type_))
 
 
-def validate_method_signature(function: ResourceMethodWithReturnValue, uri_parameters: Set[str]) -> Optional[str]:
+def validate_method_signature(method: ResourceMethodWithReturnValue, uri_parameters: Set[str]) -> Optional[str]:
     """Validate whether resource method has the right signature."""
-    hints = get_type_hints(function)
+    hints = get_type_hints(method)
 
     for parameter in filter(lambda p: hints.get(p, Any) is Any, uri_parameters):
         raise TypeValidationError(f'URI parameter {parameter} has no type hint or is not part of method signature')
@@ -100,7 +101,7 @@ def validate_method_signature(function: ResourceMethodWithReturnValue, uri_param
         hints.pop('return')
     )
 
-    if len(hints) < 2:
+    if len(inspect.getfullargspec(method).args) < 3:
         raise TypeValidationError('Every resource method must have the first two parameters as '
                                   'falcon.Request and falcon.Response')
 
@@ -120,7 +121,7 @@ def patch_resource_methods(uri_template: str, resource: Any) -> None:
     """Patch resource methods to add type hint supports."""
     uri_parameters = set(match.group('fname') for match in _FIELD_PATTERN.finditer(uri_template))
 
-    def resource_method_wrapper(function: ResourceMethodWithReturnValue) -> ResourceMethodWithoutReturnValue:
+    def resource_method_wrapper(method: ResourceMethodWithReturnValue) -> ResourceMethodWithoutReturnValue:
         """
         Wraps resource methods.
 
@@ -128,7 +129,7 @@ def patch_resource_methods(uri_template: str, resource: Any) -> None:
         it to response.media.
         """
         def curried(request: falcon.Request, response: falcon.Response, **kwargs: Any) -> None:
-            response.media = function(request, response, **kwargs)
+            response.media = method(request, response, **kwargs)
 
         return curried  # type: ignore
 
