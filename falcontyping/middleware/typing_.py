@@ -1,16 +1,15 @@
 """Typing middleware."""
-from typing import Any, Callable, Dict, Optional, get_type_hints
+from typing import Any, Callable, Dict, Optional
 
 import falcon
 from falcon import Request, Response
 
-from falcontyping.base import (MarshmallowSchema, PydanticBaseModel,
-                               TypedResource, TypeValidationError,
-                               schema_providers)
+from falcontyping.base import (PydanticBaseModel, TypedResource,
+                               TypeValidationError)
 from falcontyping.typedjson import DecodingError, ExternalSerializerException
 from falcontyping.typedjson import decode as decode_using_hints
 
-_VALID_RESPONSE_TYPES = schema_providers | set([dict])
+_VALID_RESPONSE_TYPES = set([PydanticBaseModel, dict, type(None)])
 
 
 class TypingMiddleware:
@@ -74,18 +73,18 @@ class TypingMiddleware:
 
         if handler:
             # Get hints for only those variables that should be passed to the request handler.
-            hints = get_type_hints(handler)
+            hints = resource.hints[handler.__name__]
 
             # Decode values using type hints, All values in parameters will be based as
             # Keyword arguments to the request handler.
-            for parameter in parameters:
+            for parameter in filter(hints.get, parameters):
                 parameters[parameter] = self._decode_or_raise_error(hints[parameter], parameters.get(parameter))
 
             # Decode body parameter if there is one.
-            body_parameter = resource.methods_body_parameters[handler.__name__]
+            body_parameter = resource.methods_body_parameter[handler.__name__]
             if body_parameter:
-                parameters[body_parameter] = self._decode_or_raise_error(hints[body_parameter],
-                                                                         getattr(request, 'media', None))
+                media = getattr(request, 'media', None)
+                parameters[body_parameter] = self._decode_or_raise_error(hints[body_parameter], media)
 
     def process_response(self, request: Request, response: Response, resource: Any, request_succeeded: bool) -> None:
         """
@@ -94,49 +93,28 @@ class TypingMiddleware:
         :param request: Request object.
         :param response: Response object.
         :param resource: Resource object to which the request was routed.
-        May be None if no route was found for the request.
+            May be None if no route was found for the request.
 
         :param request_succeeded: True if no exceptions were raised while the framework processed and
-        routed the request; otherwise False.
+            routed the request; otherwise False.
         """
         if not (isinstance(resource, TypedResource) and request_succeeded):
             return
 
         handler: Optional[Callable] = getattr(resource, 'on_%s' % request.method.lower(), None)
+        # Get type hint for the return type of the request handler.
+        hint: Any = resource.hints[handler.__name__].get('return') if handler else None
 
-        if handler:
-            # Get type hint for the return type of the request handler.
-            hint: Any = get_type_hints(handler)['return']
-
-            # Decode returned value using the "return" type hint.
+        if hint:
             media = getattr(response, 'media', None)
             media = decode_using_hints(hint, media)
 
-            if isinstance(media, DecodingError):
-                raise TypeValidationError(
-                    f'{resource}.{handler} returned a value of type {media}:{type(media)} instead of {hint}')
+            if not any(isinstance(media, type_) for type_ in _VALID_RESPONSE_TYPES):  # type: ignore
+                raise TypeValidationError(f'{resource}.{handler} returned a unexpected value. ',
+                                          f'Resource methods must return either Nothing, '
+                                          f'marshmallow.Schema or pydantic.BaseModel not {type(media)}')
 
-            if media is None:
-                ...
+            if isinstance(media, PydanticBaseModel):
+                media = media.dict()
 
-            else:
-                if not any(isinstance(media, type_) for type_ in _VALID_RESPONSE_TYPES):
-                    raise TypeValidationError(f'{resource}.{handler} returned a unexpected value. ',
-                                              f'Resource methods must return either Nothing, '
-                                              f'marshmallow.Schema or pydantic.BaseModel not {type(media)}')
-
-                try:
-                    if isinstance(media, dict):
-                        ...
-
-                    elif isinstance(media, PydanticBaseModel):
-                        media = media.dict()
-
-                    elif isinstance(media, MarshmallowSchema):
-                        media = hint().dump(media)
-
-                    response.media = media
-
-                except Exception:
-                    raise TypeValidationError(f'{resource}.{handler} '
-                                              f'failed to serialize {media}:{type(media)} to JSON.')
+            response.media = media

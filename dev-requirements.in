@@ -12,3 +12,6 @@ bandit
 
 pydantic
 marshmallow
+
+pytype
+pyre-check

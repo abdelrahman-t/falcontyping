@@ -6,7 +6,7 @@ with open('README.md', 'r', encoding='UTF-8') as file:
 
 setup(
     name='falcontyping',
-    version='0.2.8',
+    version='0.3.2',
     url='https://github.com/abdelrahman-t/falcontyping',
     author='Abdurrahman Talaat <abdurrahman.talaat@gmail.com>',
     author_email='abdurrahman.talaat@gmail.com',

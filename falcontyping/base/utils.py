@@ -1,9 +1,10 @@
 """Utilities."""
+import functools
 import inspect
 import itertools
 import re
-from functools import partial
-from typing import Any, Callable, List, Optional, Set, Union, get_type_hints
+from typing import (Any, Callable, Dict, List, Optional, Set, Tuple, Union,
+                    get_type_hints)
 
 import falcon
 
@@ -65,6 +66,8 @@ _METHOD_NAMES: List[str] = [
 
 def validate_type_preconditions(type_: Any) -> None:
     """Validate that used type hints are supported."""
+    if len(_AVAILABLE_EXTERNAL_SCHEMA_PRODIVERS) == 0:
+        raise TypeValidationError('No schema provider is installed. You need to install either Marshmallow or Pydantic')
 
     error = ('Resource methods must accept/return either Nothing, '
              'marshmallow.Schema or pydantic.BaseModel not {}')
@@ -83,38 +86,44 @@ def validate_type_preconditions(type_: Any) -> None:
             return (has_supported_parent or type_ == type(None)) and type_ is not Any  # noqa
 
     try:
-        if not predicate(type_):
+        if type_ and not predicate(type_):
             raise TypeValidationError(error.format(type_))
 
     except TypeError:
         raise TypeValidationError(error.format(type_))
 
 
-def validate_method_signature(method: ResourceMethodWithReturnValue, uri_parameters: Set[str]) -> Optional[str]:
-    """Validate whether resource method has the right signature."""
+def validate_method_signature(method: ResourceMethodWithReturnValue, uri_parameters: Set[str]) -> Tuple[Optional[str],
+                                                                                                        Dict]:
+    """
+    Validate whether resource method has the right signature.
+
+    :returns: Request body hints.
+    """
     hints = get_type_hints(method)
 
-    for parameter in filter(lambda p: hints.get(p, Any) is Any, uri_parameters):
-        raise TypeValidationError(f'URI parameter {parameter} has no type hint or is not part of method signature')
+    for parameter in filter(lambda p: hints.get(p, None) is Any, uri_parameters):
+        raise TypeValidationError(f'URI parameter {parameter} has no type hint')
 
     validate_type_preconditions(
-        hints.pop('return')
+        hints.get('return', None)
     )
+    arguments = inspect.getfullargspec(method).args
 
-    if len(inspect.getfullargspec(method).args) < 3:
+    if len(arguments) < 3:
         raise TypeValidationError('Every resource method must have the first two parameters as '
                                   'falcon.Request and falcon.Response')
 
-    body_parameters = set(hints) - (uri_parameters | set(itertools.islice(hints.keys(), 2)))
+    body_parameters = set(hints) - (uri_parameters | set(itertools.islice(arguments, 2)) | set(['return']))
 
     if len(body_parameters) > 1:
         raise TypeValidationError('Any resource method can not accept more than one '
                                   'marshmallow.Schema or pydantic.BaseModel as a body parameter')
 
     for parameter_name in body_parameters:
-        validate_type_preconditions(hints[parameter_name])
+        validate_type_preconditions(hints.get(parameter_name, None))
 
-    return next(iter(body_parameters), None)
+    return next(iter(body_parameters), None), hints
 
 
 def patch_resource_methods(uri_template: str, resource: Any) -> None:
@@ -128,13 +137,16 @@ def patch_resource_methods(uri_template: str, resource: Any) -> None:
         This function will takes whatever is returned by resource methods and assigns
         it to response.media.
         """
+        @functools.wraps(method)
         def curried(request: falcon.Request, response: falcon.Response, **kwargs: Any) -> None:
             response.media = method(request, response, **kwargs)
 
-        return curried  # type: ignore
+        return curried
 
-    resource.methods_body_parameters = {}
-    for method_name in filter(partial(hasattr, resource), _METHOD_NAMES):
+    resource.methods_body_parameter = {}
+    resource.hints = {}
+
+    for method_name in filter(functools.partial(hasattr, resource), _METHOD_NAMES):
 
         method: ResourceMethodWithReturnValue = getattr(resource, method_name)
 
@@ -142,17 +154,14 @@ def patch_resource_methods(uri_template: str, resource: Any) -> None:
             raise TypeValidationError(f'{resource}.{method_name} must be a Callable')
 
         try:
-            resource.methods_body_parameters[method_name] = validate_method_signature(method,
-                                                                                      uri_parameters=uri_parameters)
+            body_parameter, hints = validate_method_signature(method, uri_parameters=uri_parameters)
+
+            resource.methods_body_parameter[method_name] = body_parameter
+            resource.hints[method_name] = hints
 
         except TypeValidationError as e:
-            raise TypeValidationError(f'{resource}.{method} raised: {e}') from None
+            raise TypeValidationError(f'{resource}.{method} raised: {e}')
 
         wrapped = resource_method_wrapper(method)
-
-        # Preserve documentation and annotations
-        wrapped.__name__ = method.__name__  # type: ignore
-        wrapped.__doc__ = method.__doc__
-        wrapped.__annotations__ = method.__annotations__
 
         setattr(resource, method_name, wrapped)
