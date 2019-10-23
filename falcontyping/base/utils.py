@@ -98,23 +98,23 @@ def validate_method_signature(method: ResourceMethodWithReturnValue, uri_paramet
     """
     Validate whether resource method has the right signature.
 
-    :returns: Request body hints.
+    :returns: body parameter name and hints
     """
     hints = get_type_hints(method)
+    arguments = inspect.getfullargspec(method).args
 
-    for parameter in filter(lambda p: hints.get(p, None) is Any, uri_parameters):
-        raise TypeValidationError(f'URI parameter {parameter} has no type hint')
+    for parameter in filter(lambda p: hints.get(p, None) is Any or p not in arguments, uri_parameters):
+        raise TypeValidationError(f'URI parameter {parameter} has type hint Any or is missing from signature')
 
     validate_type_preconditions(
         hints.get('return', None)
     )
-    arguments = inspect.getfullargspec(method).args
 
     if len(arguments) < 3:
         raise TypeValidationError('Every resource method must have the first two parameters as '
                                   'falcon.Request and falcon.Response')
 
-    body_parameters = set(hints) - (uri_parameters | set(itertools.islice(arguments, 2)) | set(['return']))
+    body_parameters = set(hints) - (uri_parameters | set(itertools.islice(arguments, 3)) | set(['return']))
 
     if len(body_parameters) > 1:
         raise TypeValidationError('Any resource method can not accept more than one '
