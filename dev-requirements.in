@@ -15,3 +15,5 @@ marshmallow
 
 pytype
 pyre-check
+
+pytest
