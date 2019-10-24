@@ -1,2 +1,6 @@
 [run]
 source=falcontyping
+
+omit =
+    falcontyping/typedjson/base.py
+    falcontyping/typedjson/annotation.py

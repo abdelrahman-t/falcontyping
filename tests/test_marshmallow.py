@@ -4,20 +4,20 @@ from typing import Union
 import falcon
 import falcon.testing
 import pytest
-from pydantic import BaseModel
+from marshmallow import Schema, fields
 
-from . import TypedAPI, TypedResource
-from .base.exceptions import TypeValidationError
-
-
-class Model(BaseModel):
-
-    field: int
+from falcontyping import TypedAPI, TypedResource
+from falcontyping.base.exceptions import TypeValidationError
 
 
-class AnotherModel(BaseModel):
+class Model(Schema):
 
-    another_field: int
+    field = fields.Integer()
+
+
+class AnotherModel(Schema):
+
+    another_field = fields.Integer()
 
 
 class TestValidation:
@@ -50,6 +50,12 @@ class TestValidation:
 
         # Invalid because it is missing one query parameter from route or has an extra request parameter
         def on_delete(self, request, response, query_parameter, request_parameter: Model, extra_parameter) -> Model:
+            pass
+
+    class InvalidResourceWithQueryParameter6(TypedResource):
+
+        # Invalid because it violates protocol
+        def on_delete(self, request: int, response, request_parameter: Model) -> Model:
             pass
 
     class InvalidResourceWithoutQueryParameter1(TypedResource):
@@ -107,6 +113,9 @@ class TestValidation:
             TypedAPI().add_route('/resource/{query_parameter}', self.InvalidResourceWithQueryParameter5())
 
         with pytest.raises(TypeValidationError):
+            TypedAPI().add_route('/resource/{query_parameter}', self.InvalidResourceWithQueryParameter6())
+
+        with pytest.raises(TypeValidationError):
             TypedAPI().add_route('/resource/{query_parameter}', self.InvalidResourceWithQueryParameter1())
 
         with pytest.raises(TypeValidationError):
@@ -140,6 +149,9 @@ class TestMiddleware:
         _API.add_route('/resource7/{query_parameter}', self.ValidResourceWithQueryParameter7())
         _API.add_route('/resource8/{query_parameter}', self.ValidResourceWithQueryParameter8())
         _API.add_route('/resource9/{query_parameter}', self.ValidResourceWithQueryParameter9())
+        _API.add_route('/resource10/{query_parameter}', self.ValidResourceWithQueryParameter10())
+        _API.add_route('/resource11/{query_parameter}', self.ValidResourceWithQueryParameter11())
+        _API.add_route('/resource12/{query_parameter}', self.ValidResourceWithQueryParameter12())
 
         return falcon.testing.TestClient(_API)
 
@@ -159,7 +171,7 @@ class TestMiddleware:
 
         # A method with no query parameter annotation
         def on_post(self, request: falcon.Request, response: falcon.Response, query_parameter) -> Model:
-            return Model(field=0)
+            return dict(field=0)
 
     class ValidResourceWithQueryParameter4(TypedResource):
 
@@ -178,7 +190,7 @@ class TestMiddleware:
         # A method with a mix of annotated and non-annotated arguments
         def on_post(self, request, response, field: Model, query_parameter: int) -> Model:
             assert isinstance(query_parameter, int)
-            assert isinstance(field, Model)
+            assert isinstance(field, dict)
 
             return field
 
@@ -187,7 +199,7 @@ class TestMiddleware:
         # A method with a mix of annotated and non-annotated arguments and multiple return types
         def on_post(self, request, response, field: Model, query_parameter: int) -> Union[Model, None]:
             assert isinstance(query_parameter, int)
-            assert isinstance(field, Model)
+            assert isinstance(field, dict)
 
             return field
 
@@ -196,7 +208,7 @@ class TestMiddleware:
         # A method with a mix of annotated and non-annotated arguments and multiple return types
         def on_post(self, request, response, field: Model, query_parameter: int) -> Union[Model, None]:
             assert isinstance(query_parameter, int)
-            assert isinstance(field, Model)
+            assert isinstance(field, dict)
 
             return None
 
@@ -205,9 +217,36 @@ class TestMiddleware:
         # A method with a mix of annotated and non-annotated arguments and multiple return types
         def on_post(self, request, response, field: Model, query_parameter: int) -> Union[None, Model, AnotherModel]:
             assert isinstance(query_parameter, int)
-            assert isinstance(field, Model)
+            assert isinstance(field, dict)
 
-            return AnotherModel(another_field=0)
+            return dict(another_field=0)
+
+    class ValidResourceWithQueryParameter10(TypedResource):
+
+        # Raises an error because user sends invalid payload
+        def on_post(self, request, response, field: Model, query_parameter: int) -> Union[None, Model, AnotherModel]:
+            assert isinstance(query_parameter, int)
+            assert isinstance(field, dict)
+
+            return dict(another_field=0)
+
+    class ValidResourceWithQueryParameter11(TypedResource):
+
+        # Raises an error because user sends invalid payload
+        def on_post(self, request, response, field: Model, query_parameter: int) -> Union[None, Model, AnotherModel]:
+            assert isinstance(query_parameter, int)
+            assert isinstance(field, dict)
+
+            return dict(another_field=0)
+
+    class ValidResourceWithQueryParameter12(TypedResource):
+
+        # A method that has correct annotations but returns a mismatching type.
+        def on_post(self, request, response, field: Model, query_parameter: int) -> Union[Model, AnotherModel]:
+            assert isinstance(query_parameter, int)
+            assert isinstance(field, dict)
+
+            return None
 
     def test_resource_with_query_parameters(self, API):
         assert API.simulate_post('/resource1/1').json is None
@@ -220,3 +259,9 @@ class TestMiddleware:
         assert API.simulate_post('/resource7/7', json={'field': 0}).json == {'field': 0}
         assert API.simulate_post('/resource8/8', json={'field': 0}).json is None
         assert API.simulate_post('/resource9/9', json={'field': 0}).json == {'another_field': 0}
+
+        API.simulate_post('/resource10/not-an-int', json={'field': 0}).status == 422
+        API.simulate_post('/resource11/11', json={'unknown-field': 0}).status == 422
+
+        with pytest.raises(TypeValidationError):
+            API.simulate_post('/resource12/12', json={'field': 0})

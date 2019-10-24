@@ -114,6 +114,12 @@ def validate_method_signature(method: ResourceMethodWithReturnValue, uri_paramet
         raise TypeValidationError('Every resource method must have the first two parameters as '
                                   'falcon.Request and falcon.Response')
 
+    if hints.get(arguments[1], Any) not in [falcon.Request, Any]:
+        raise TypeValidationError('First parameter must be of type falcon.Request')
+
+    if hints.get(arguments[2], Any) not in [falcon.Response, Any]:
+        raise TypeValidationError('Second parameter must be of type falcon.Response')
+
     body_parameters = set(arguments) - (uri_parameters | set(itertools.islice(arguments, 3)) | set(['return']))
 
     if len(body_parameters) > 1 and any(hints.get(parameter) for parameter in body_parameters):
