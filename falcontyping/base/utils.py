@@ -114,16 +114,16 @@ def validate_method_signature(method: ResourceMethodWithReturnValue, uri_paramet
         raise TypeValidationError('Every resource method must have the first two parameters as '
                                   'falcon.Request and falcon.Response')
 
-    body_parameters = set(hints) - (uri_parameters | set(itertools.islice(arguments, 3)) | set(['return']))
+    body_parameters = set(arguments) - (uri_parameters | set(itertools.islice(arguments, 3)) | set(['return']))
 
-    if len(body_parameters) > 1:
-        raise TypeValidationError('Any resource method can not accept more than one '
-                                  'marshmallow.Schema or pydantic.BaseModel as a body parameter')
+    if len(body_parameters) > 1 and any(hints.get(parameter) for parameter in body_parameters):
+        raise TypeValidationError('Any resource method can not accept more than one request parameter, that is one'
+                                  'parameter of type marshmallow.Schema or pydantic.BaseModel')
 
     for parameter_name in body_parameters:
         validate_type_preconditions(hints.get(parameter_name, None))
 
-    return next(iter(body_parameters), None), hints
+    return next(iter(body_parameters & set(hints)), None), hints
 
 
 def patch_resource_methods(uri_template: str, resource: Any) -> None:
@@ -139,7 +139,10 @@ def patch_resource_methods(uri_template: str, resource: Any) -> None:
         """
         @functools.wraps(method)
         def curried(request: falcon.Request, response: falcon.Response, **kwargs: Any) -> None:
-            response.media = method(request, response, **kwargs)
+            media = method(request, response, **kwargs)
+
+            if media:
+                response.media = media
 
         return curried
 

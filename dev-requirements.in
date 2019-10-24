@@ -17,3 +17,5 @@ pytype
 pyre-check
 
 pytest
+pytest-cov
+codecov
