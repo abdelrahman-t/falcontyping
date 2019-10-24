@@ -17,17 +17,17 @@ try:
 
     class ResourceMethodWithoutReturnValue(Protocol):
 
-        def __call__(self, request: falcon.Request, respone: falcon.Response, **kwargs: Any) -> None:
+        def __call__(self, request: falcon.Request, respone: falcon.Response, **kwargs: Any) -> None:  # pragma: no cover
             ...
 
     class ResourceMethodWithReturnValue(Protocol):
 
-        def __call__(self, request: falcon.Request, respone: falcon.Response, **kwargs: Any) -> Any:
+        def __call__(self, request: falcon.Request, respone: falcon.Response, **kwargs: Any) -> Any:  # pragma: no cover
             ...
 
-except ImportError:
-    ResourceMethodWithoutReturnValue = Callable  # type: ignore
-    ResourceMethodWithReturnValue = Callable     # type: ignore
+except ImportError:  # pragma: no cover
+    ResourceMethodWithoutReturnValue = Callable  # type: ignore # pragma: no cover
+    ResourceMethodWithReturnValue = Callable     # type: ignore # pragma: no cover
 
 try:
     from pydantic import BaseModel as PydanticBaseModel

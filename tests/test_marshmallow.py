@@ -55,8 +55,19 @@ class TestValidation:
     class InvalidResourceWithQueryParameter6(TypedResource):
 
         # Invalid because it violates protocol
-        def on_delete(self, request: int, response, request_parameter: Model) -> Model:
+        def on_delete(self, request: int, response, query_parameter) -> Model:
             pass
+
+    class InvalidResourceWithQueryParameter7(TypedResource):
+
+        # Invalid because it violates protocol
+        def on_delete(self, request, response: int, query_parameter) -> Model:
+            pass
+
+    class InvalidResourceWithQueryParameter8(TypedResource):
+
+        # Invalid because it violates protocol
+        on_delete = None
 
     class InvalidResourceWithoutQueryParameter1(TypedResource):
 
@@ -114,6 +125,12 @@ class TestValidation:
 
         with pytest.raises(TypeValidationError):
             TypedAPI().add_route('/resource/{query_parameter}', self.InvalidResourceWithQueryParameter6())
+
+        with pytest.raises(TypeValidationError):
+            TypedAPI().add_route('/resource/{query_parameter}', self.InvalidResourceWithQueryParameter7())
+
+        with pytest.raises(TypeValidationError):
+            TypedAPI().add_route('/resource/{query_parameter}', self.InvalidResourceWithQueryParameter8())
 
         with pytest.raises(TypeValidationError):
             TypedAPI().add_route('/resource/{query_parameter}', self.InvalidResourceWithQueryParameter1())
@@ -190,7 +207,7 @@ class TestMiddleware:
         # A method with a mix of annotated and non-annotated arguments
         def on_post(self, request, response, field: Model, query_parameter: int) -> Model:
             assert isinstance(query_parameter, int)
-            assert isinstance(field, dict)
+            Model().load(field)
 
             return field
 
@@ -199,7 +216,7 @@ class TestMiddleware:
         # A method with a mix of annotated and non-annotated arguments and multiple return types
         def on_post(self, request, response, field: Model, query_parameter: int) -> Union[Model, None]:
             assert isinstance(query_parameter, int)
-            assert isinstance(field, dict)
+            Model().load(field)
 
             return field
 
@@ -208,7 +225,7 @@ class TestMiddleware:
         # A method with a mix of annotated and non-annotated arguments and multiple return types
         def on_post(self, request, response, field: Model, query_parameter: int) -> Union[Model, None]:
             assert isinstance(query_parameter, int)
-            assert isinstance(field, dict)
+            Model().load(field)
 
             return None
 
@@ -217,7 +234,7 @@ class TestMiddleware:
         # A method with a mix of annotated and non-annotated arguments and multiple return types
         def on_post(self, request, response, field: Model, query_parameter: int) -> Union[None, Model, AnotherModel]:
             assert isinstance(query_parameter, int)
-            assert isinstance(field, dict)
+            Model().load(field)
 
             return dict(another_field=0)
 
@@ -226,7 +243,7 @@ class TestMiddleware:
         # Raises an error because user sends invalid payload
         def on_post(self, request, response, field: Model, query_parameter: int) -> Union[None, Model, AnotherModel]:
             assert isinstance(query_parameter, int)
-            assert isinstance(field, dict)
+            Model().load(field)
 
             return dict(another_field=0)
 
@@ -235,7 +252,7 @@ class TestMiddleware:
         # Raises an error because user sends invalid payload
         def on_post(self, request, response, field: Model, query_parameter: int) -> Union[None, Model, AnotherModel]:
             assert isinstance(query_parameter, int)
-            assert isinstance(field, dict)
+            assert Model().load(field)
 
             return dict(another_field=0)
 
@@ -244,7 +261,7 @@ class TestMiddleware:
         # A method that has correct annotations but returns a mismatching type.
         def on_post(self, request, response, field: Model, query_parameter: int) -> Union[Model, AnotherModel]:
             assert isinstance(query_parameter, int)
-            assert isinstance(field, dict)
+            Model().load(field)
 
             return None
 

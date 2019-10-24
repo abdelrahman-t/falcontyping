@@ -55,8 +55,19 @@ class TestValidation:
     class InvalidResourceWithQueryParameter6(TypedResource):
 
         # Invalid because it violates protocol
-        def on_delete(self, request: int, response, request_parameter: Model) -> Model:
+        def on_delete(self, request: int, response, query_parameter) -> Model:
             pass
+
+    class InvalidResourceWithQueryParameter7(TypedResource):
+
+        # Invalid because it violates protocol
+        def on_delete(self, request, response: int, query_parameter) -> Model:
+            pass
+
+    class InvalidResourceWithQueryParameter8(TypedResource):
+
+        # Invalid because it violates protocol
+        on_delete = None
 
     class InvalidResourceWithoutQueryParameter1(TypedResource):
 
@@ -114,6 +125,12 @@ class TestValidation:
 
         with pytest.raises(TypeValidationError):
             TypedAPI().add_route('/resource/{query_parameter}', self.InvalidResourceWithQueryParameter6())
+
+        with pytest.raises(TypeValidationError):
+            TypedAPI().add_route('/resource/{query_parameter}', self.InvalidResourceWithQueryParameter7())
+
+        with pytest.raises(TypeValidationError):
+            TypedAPI().add_route('/resource/{query_parameter}', self.InvalidResourceWithQueryParameter8())
 
         with pytest.raises(TypeValidationError):
             TypedAPI().add_route('/resource/{query_parameter}', self.InvalidResourceWithQueryParameter1())
