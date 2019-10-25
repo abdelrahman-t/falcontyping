@@ -83,7 +83,7 @@ class TypingMiddleware:  # pragma: no cover
             # Decode body parameter if there is one.
             body_parameter = resource.methods_body_parameter[handler.__name__]
             if body_parameter:
-                media = getattr(request, 'media', None)
+                media = getattr(request, 'media', None) or getattr(request, 'params', None)
                 parameters[body_parameter] = self._decode_or_raise_error(hints[body_parameter], media)
 
     def process_response(self, request: Request, response: Response, resource: Any, request_succeeded: bool) -> None:
