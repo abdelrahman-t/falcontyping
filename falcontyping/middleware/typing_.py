@@ -19,7 +19,7 @@ class TypingMiddleware:  # pragma: no cover
         """
         Decode value using type hint or fail.
 
-        :raises: falcon.HTTPError
+        :raises: falcon.HTTPError or ExternalSerializerException
         """
         result = decode_using_hints(hint, parameter)
 
@@ -32,6 +32,18 @@ class TypingMiddleware:  # pragma: no cover
                                        description=f'\'{parameter}\' must be of type {hint} not {type(parameter)}')
 
         return result
+
+    @staticmethod
+    def _try_decode_query_or_body(request: falcon.Request, hint: Any) -> Any:
+        """Decode values by looking for them in both URI and request body."""
+        # An assumption is being made here, That only POST, PUT and PATCH can have bodies.
+        if request.method.lower() in ['post', 'put', 'patch']:
+            key = 'media'
+
+        else:
+            key = 'params'
+
+        return TypingMiddleware._decode_or_raise_error(hint, getattr(request, key, None))
 
     def process_request(self, request: Request, response: Response) -> None:
         """
@@ -83,8 +95,7 @@ class TypingMiddleware:  # pragma: no cover
             # Decode body parameter if there is one.
             body_parameter = resource.methods_body_parameter[handler.__name__]
             if body_parameter:
-                media = getattr(request, 'media', None) or getattr(request, 'params', None)
-                parameters[body_parameter] = self._decode_or_raise_error(hints[body_parameter], media)
+                parameters[body_parameter] = self._try_decode_query_or_body(request, hints[body_parameter])
 
     def process_response(self, request: Request, response: Response, resource: Any, request_succeeded: bool) -> None:
         """
