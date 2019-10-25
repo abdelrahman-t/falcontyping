@@ -233,9 +233,9 @@ pyre-extensions==0.0.16 \
 pytest-cov==2.8.1 \
     --hash=sha256:cc6742d8bac45070217169f5f72ceee1e0e55b0221f54bcf24845972d3a47f2b \
     --hash=sha256:cdbdef4f870408ebdbfeb44e63e07eb18bb4619fae852f6e760645fa36172626
-pytest==5.2.1 \
-    --hash=sha256:7e4800063ccfc306a53c461442526c5571e1462f61583506ce97e4da6a1d88c8 \
-    --hash=sha256:ca563435f4941d0cb34767301c27bc65c510cb82e90b9ecf9cb52dc2c63caaa0
+pytest==5.2.2 \
+    --hash=sha256:27abc3fef618a01bebb1f0d6d303d2816a99aa87a5968ebc32fe971be91eb1e6 \
+    --hash=sha256:58cee9e09242937e136dbb3dab466116ba20d6b7828c7620f23947f37eb4dae4
 pytype==2019.10.17 \
     --hash=sha256:ff43dd0abc144ddf4d895ea52918b5d4bbd0f96b690af205e477cb1074b6ef4e
 pywatchman==1.4.1 \
