@@ -1,7 +1,7 @@
 # Falcon typing
 
-![PyPI - Python Version](https://img.shields.io/pypi/pyversions/falcontyping)
-![PyPI](https://img.shields.io/pypi/v/falcontyping)
+[![PyPI](https://img.shields.io/pypi/pyversions/falcontyping)](https://pypi.org/project/falcontyping)
+[![PyPI](https://img.shields.io/pypi/v/falcontyping)](https://pypi.org/project/falcontyping)
 [![codecov](https://codecov.io/gh/abdelrahman-t/falcontyping/branch/master/graph/badge.svg)](https://codecov.io/gh/abdelrahman-t/falcontyping)
 [![Build Status](https://travis-ci.org/abdelrahman-t/falcontyping.svg?branch=master)](https://travis-ci.org/abdelrahman-t/falcontyping)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
