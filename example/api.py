@@ -5,8 +5,6 @@ from pydantic import BaseModel as PydanticModel
 
 from falcontyping import TypedAPI, TypedResource
 
-API = TypedAPI()
-
 
 class UserV1(PydanticModel):
 
@@ -19,7 +17,7 @@ class UserV2(PydanticModel):
     balance: float
 
 
-class UserResource(TypedResource):
+class UsersResource(TypedResource):
 
     def on_post(self, request, response, user: Union[UserV2, UserV1]) -> Union[UserV2, UserV1]:
         if isinstance(user, UserV2):
@@ -41,5 +39,6 @@ class UserDetailsResource(TypedResource):
         return None
 
 
-API.add_route('/users', UserResource())
+API = TypedAPI()
+API.add_route('/users', UsersResource())
 API.add_route('/users/{user_id}', UserDetailsResource())

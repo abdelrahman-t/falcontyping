@@ -22,6 +22,7 @@ class UserV1(PydanticModel):
 
     username: str
 
+
 class UserV2(PydanticModel):
 
     username: str
@@ -37,6 +38,7 @@ class UsersResource(TypedResource):
         else:
             return UserV1(username=user.username)
 
+
 class UserDetailsResource(TypedResource):
 
     def on_get(self, request, response, user_id: int) -> Optional[Union[UserV2, UserV1]]:
@@ -48,8 +50,9 @@ class UserDetailsResource(TypedResource):
 
         return None
 
+
 API = TypedAPI()
-API.add_route('/users', UserResource())
+API.add_route('/users', UsersResource())
 API.add_route('/users/{user_id}', UserDetailsResource())
 ```
 
