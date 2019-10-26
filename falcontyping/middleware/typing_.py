@@ -12,7 +12,7 @@ from falcontyping.typedjson import decode as decode_using_hints
 _VALID_RESPONSE_TYPES = set([PydanticBaseModel, dict, type(None)])
 
 
-class TypingMiddleware:  # pragma: no cover
+class TypingMiddleware:
 
     @staticmethod
     def _decode_or_raise_error(hint: Any, parameter: Any) -> Any:
