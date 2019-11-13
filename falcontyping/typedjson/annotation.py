@@ -69,7 +69,7 @@ def origin_of(type_: Type) -> Optional[Type]:
     from typing import List
     from typing import Tuple
 
-    origin = getattr(type_, "__origin__", None)
+    origin = getattr(type_, "__origin__", None) or type_
 
     # In Python 3.6, the origin of Tuple type is `List` but in Python 3.7 it is `list`.
     if origin is List:
@@ -78,7 +78,7 @@ def origin_of(type_: Type) -> Optional[Type]:
     elif origin is Tuple:
         return tuple
     else:
-        return origin  # type: ignore
+        return origin
 
 
 def parameters_of(type_: Type) -> Tuple[Type, ...]:

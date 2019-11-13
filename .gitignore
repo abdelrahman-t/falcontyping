@@ -5,3 +5,6 @@ dist
 build
 MANIFEST
 *.egg-info
+.coverage
+.pyre/
+.pytype/

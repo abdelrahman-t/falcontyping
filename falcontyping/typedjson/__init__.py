@@ -25,6 +25,7 @@ Author: Tomoya Kose <tomoya@mitsuse.jp>
 Repository: https://github.com/mitsuse/typedjson-python
 """
 from .annotation import args_of, origin_of
-from .decoding import DecodingError, ExternalSerializerException, decode
+from .decoding import (DecodingError, ExternalSerializerException, decode,
+                       register_type)
 
-__all__ = ['args_of', 'origin_of', 'DecodingError', 'ExternalSerializerException', 'decode']
+__all__ = ['args_of', 'origin_of', 'DecodingError', 'ExternalSerializerException', 'decode', 'register_type']

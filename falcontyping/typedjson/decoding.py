@@ -27,7 +27,7 @@ https://github.com/mitsuse/typedjson-python/blob/master/typedjson/decoding.py
 Author: Tomoya Kose <tomoya@mitsuse.jp>
 Repository: https://github.com/mitsuse/typedjson-python
 """
-from typing import Any, Type, TypeVar, Union
+from typing import Any, Set, Type, TypeVar, Union
 
 from .base import (Decoded, DecodingError, ExternalSerializerException, Path,
                    TypeMismatch, UnsupportedDecoding)
@@ -46,6 +46,13 @@ except ImportError:
     MarshmallowSchema = None  # type: ignore
 
 _PRIMITIVE_TYPES = (str, float, int, bool, type(None))
+_SUPPORTED_SERIALIZATION_TYPES = set(_PRIMITIVE_TYPES + (MarshmallowSchema, PydanticBaseModel))
+_REGISTERED_TYPES: Set[Type] = set()
+
+
+def register_type(type_: Type) -> None:
+    if type_ not in _SUPPORTED_SERIALIZATION_TYPES and type_ not in _PRIMITIVE_TYPES:
+        _REGISTERED_TYPES.add(type_)
 
 
 def parse_int_from_string(json: str, path: Path) -> Union[Decoded, DecodingError]:
@@ -81,7 +88,8 @@ def decode(type_: Type[Decoded], json: Any, path: Path = ()) -> Union[Decoded, D
     decoders = (
         decode_as_union,
         decode_as_primitive,
-        decode_as_model
+        decode_as_model,
+        decode_as_class
     )
 
     result_final: Union[Decoded, DecodingError] = DecodingError(
@@ -91,8 +99,9 @@ def decode(type_: Type[Decoded], json: Any, path: Path = ()) -> Union[Decoded, D
         result = decoder(type_, json, path)
 
         if isinstance(result, DecodingError):
-            if isinstance(result.reason, TypeMismatch):
+            if isinstance(result.reason, TypeMismatch) or isinstance(result.reason, ExternalSerializerException):
                 result_final = result
+
         else:
             result_final = result
             break
@@ -101,29 +110,28 @@ def decode(type_: Type[Decoded], json: Any, path: Path = ()) -> Union[Decoded, D
 
 
 def decode_as_model(type_: Type[Decoded], json: Any, path: Path) -> Union[Decoded, DecodingError]:
-    from .annotation import origin_of
+    try:
+        if isinstance(json, type_):
+            return json
 
-    if origin_of(type_) in (Union, Any, ):
-        return DecodingError(UnsupportedDecoding(path))
+        if PydanticBaseModel and issubclass(type_, PydanticBaseModel):
+            if json:
+                return parse_pydantic_from_dict(type_, json=json, path=path)
 
-    if isinstance(json, type_):
-        return json
+            else:
+                return DecodingError(TypeMismatch(path))
 
-    if PydanticBaseModel and issubclass(type_, PydanticBaseModel):
-        if json:
-            return parse_pydantic_from_dict(type_, json=json, path=path)
+        elif MarshmallowSchema and issubclass(type_, MarshmallowSchema):
+            if json:
+                return parse_marshmallow_from_dict(type_, json=json, path=path)
+
+            else:
+                return DecodingError(TypeMismatch(path))
 
         else:
-            return DecodingError(TypeMismatch(path))
+            return DecodingError(UnsupportedDecoding(path))
 
-    elif MarshmallowSchema and issubclass(type_, MarshmallowSchema):
-        if json:
-            return parse_marshmallow_from_dict(type_, json=json, path=path)
-
-        else:
-            return DecodingError(TypeMismatch(path))
-
-    else:
+    except TypeError:
         return DecodingError(UnsupportedDecoding(path))
 
 
@@ -161,3 +169,16 @@ def decode_as_union(type_: Type[Decoded], json: Any, path: Path) -> Union[Decode
         return decoded
     else:
         return DecodingError(UnsupportedDecoding(path))
+
+
+def decode_as_class(
+    type_: Type[Decoded], json: Any, path: Path
+) -> Union[Decoded, DecodingError]:
+    try:
+        if type_ not in _REGISTERED_TYPES:
+            return DecodingError(UnsupportedDecoding(path))
+
+        return type_(json)  # type: ignore
+
+    except Exception as e:
+        return DecodingError(reason=ExternalSerializerException(path, exception=e))

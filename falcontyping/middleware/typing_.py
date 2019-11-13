@@ -1,4 +1,5 @@
 """Typing middleware."""
+from operator import attrgetter
 from typing import Any, Callable, Dict, Optional
 
 import falcon
@@ -25,25 +26,14 @@ class TypingMiddleware:
 
         if isinstance(result, DecodingError):
             if isinstance(result.reason, ExternalSerializerException):
-                raise result.reason.exception from None
+                raise falcon.HTTPError(status=falcon.HTTP_UNPROCESSABLE_ENTITY,  # pylint: disable=no-member
+                                       description=str(result.reason.exception))
 
             else:
                 raise falcon.HTTPError(status=falcon.HTTP_UNPROCESSABLE_ENTITY,  # pylint: disable=no-member
                                        description=f'\'{parameter}\' must be of type {hint} not {type(parameter)}')
 
         return result
-
-    @staticmethod
-    def _try_decode_query_or_body(request: falcon.Request, hint: Any) -> Any:
-        """Decode values by looking for them in both URI and request body."""
-        # An assumption is being made here, That only POST, PUT and PATCH can have bodies.
-        if request.method.lower() in ['post', 'put', 'patch']:
-            key = 'media'
-
-        else:
-            key = 'params'
-
-        return TypingMiddleware._decode_or_raise_error(hint, getattr(request, key, None))
 
     def process_request(self, request: Request, response: Response) -> None:
         """
@@ -81,21 +71,34 @@ class TypingMiddleware:
         if not isinstance(resource, TypedResource):
             return
 
-        handler: Optional[Callable] = getattr(resource, 'on_%s' % request.method.lower(), None)
+        method = 'on_%s' % request.method.lower()
+        handler: Optional[Callable] = getattr(resource, method, None)
 
-        if handler:
-            # Get hints for only those variables that should be passed to the request handler.
-            hints = resource.hints[handler.__name__]
+        if handler is None:
+            return
 
-            # Decode values using type hints, All values in parameters will be based as
-            # Keyword arguments to the request handler.
-            for parameter in filter(hints.get, parameters):
-                parameters[parameter] = self._decode_or_raise_error(hints[parameter], parameters.get(parameter))
+        annotations = resource.annotations[method]
 
-            # Decode body parameter if there is one.
-            body_parameter = resource.methods_body_parameter[handler.__name__]
-            if body_parameter:
-                parameters[body_parameter] = self._try_decode_query_or_body(request, hints[body_parameter])
+        for path_parameter in filter(attrgetter('is_usable'), annotations.path):
+            value = parameters.get(path_parameter.name)
+
+            if value is None:
+                raise falcon.HTTPBadRequest(  # pylint: disable=no-member
+                    f'Path parameter {path_parameter.name} must be specified')
+
+            parameters[path_parameter.name] = self._decode_or_raise_error(path_parameter.wrapped_type, value)
+
+        if annotations.query and annotations.query.is_usable:
+            query_parameter = annotations.query
+
+            parameters[query_parameter.name] = self._decode_or_raise_error(query_parameter.wrapped_type,
+                                                                           request.params)
+
+        if annotations.body and annotations.body.is_usable:
+            body_parameter = annotations.body
+
+            parameters[body_parameter.name] = self._decode_or_raise_error(body_parameter.wrapped_type,
+                                                                          request.media)
 
     def process_response(self, request: Request, response: Response, resource: Any, request_succeeded: bool) -> None:
         """
@@ -109,16 +112,17 @@ class TypingMiddleware:
         :param request_succeeded: True if no exceptions were raised while the framework processed and
             routed the request; otherwise False.
         """
-        if not (isinstance(resource, TypedResource) and request_succeeded):
+        if not(request_succeeded and isinstance(resource, TypedResource)):
             return
 
-        handler: Optional[Callable] = getattr(resource, 'on_%s' % request.method.lower(), None)
-        # Get type hint for the return type of the request handler.
-        hint: Any = resource.hints[handler.__name__].get('return') if handler else None
+        method = 'on_%s' % request.method.lower()
 
-        if hint:
+        handler: Optional[Callable] = getattr(resource, method, None)
+        returns: Any = resource.annotations[method].returns
+
+        if returns:
             media = getattr(response, 'media', None)
-            media = decode_using_hints(hint, media)
+            media = decode_using_hints(returns, media)
 
             if not any(isinstance(media, type_) for type_ in _VALID_RESPONSE_TYPES):  # type: ignore
                 raise TypeValidationError(f'{resource}.{handler} returned a unexpected value. ',

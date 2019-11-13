@@ -3,26 +3,30 @@ import functools
 import inspect
 import itertools
 import re
-from typing import (Any, Callable, Dict, List, Optional, Set, Tuple, Union,
-                    get_type_hints)
+from typing import (Any, Callable, Dict, List, Optional, Set, Type, Union,
+                    cast, get_type_hints)
 
 import falcon
 
-from falcontyping.typedjson import args_of, origin_of
+from falcontyping.typedjson import args_of, origin_of, register_type
 
 from .exceptions import TypeValidationError
+from .resource import HTTPMethodAnnotation, TypedResource
+from .types_ import Body as BodyParameter
+from .types_ import Path as PathParameter
+from .types_ import Query as QueryParameter
 
 try:
     from typing_extensions import Protocol
 
     class ResourceMethodWithoutReturnValue(Protocol):
 
-        def __call__(self, request: falcon.Request, respone: falcon.Response, **kwargs: Any) -> None:  # pragma: no cover
+        def __call__(self, request: falcon.Request, response: falcon.Response, **kwargs: Any) -> None:  # pragma: no cover # noqa
             ...
 
     class ResourceMethodWithReturnValue(Protocol):
 
-        def __call__(self, request: falcon.Request, respone: falcon.Response, **kwargs: Any) -> Any:  # pragma: no cover
+        def __call__(self, request: falcon.Request, response: falcon.Response, **kwargs: Any) -> Any:  # pragma: no cover # noqa
             ...
 
 except ImportError:  # pragma: no cover
@@ -63,14 +67,34 @@ _METHOD_NAMES: List[str] = [
     'on_%s' % method for method in ('get', 'post', 'put', 'patch', 'delete', 'head', 'options')
 ]
 
+_HTTP_VERBS_WITH_BODIES = {'on_post', 'on_put', 'on_patch'}
 
-def validate_type_preconditions(type_: Any) -> None:
+
+def is_supported_request_type(type_: Any) -> bool:
+    """Check if type is a supported type for serialization/deserialization."""
+    if isinstance(type_, QueryParameter) or isinstance(type_, BodyParameter):
+        type_ = type_.wrapped_type
+
+    has_supported_parent = any(
+        issubclass(type_, parent) for parent in _AVAILABLE_EXTERNAL_SCHEMA_PRODIVERS
+    )
+
+    return (has_supported_parent or type_ == type(None)) and type_ is not Any  # noqa
+
+
+def is_supported_response_type(type_: Any) -> bool:
+    """Check if type is a supported type for serialization/deserialization."""
+    has_supported_parent = any(
+        issubclass(type_, parent) for parent in _AVAILABLE_EXTERNAL_SCHEMA_PRODIVERS
+    )
+
+    return (has_supported_parent or type_ == type(None)) and type_ is not Any  # noqa
+
+
+def validate_type_preconditions(type_: Any, type_checker: Callable[..., bool]) -> None:
     """Validate that used type hints are supported."""
     if len(_AVAILABLE_EXTERNAL_SCHEMA_PRODIVERS) == 0:
         raise TypeValidationError('No schema provider is installed. You need to install either Marshmallow or Pydantic')
-
-    error = ('Resource methods must accept/return either Nothing, '
-             'marshmallow.Schema or pydantic.BaseModel not {}')
 
     def predicate(type_: Any) -> bool:
         """Check if type can be used in the body of the request or response."""
@@ -80,10 +104,10 @@ def validate_type_preconditions(type_: Any) -> None:
             return all(predicate(arg) for arg in args)
 
         else:
-            has_supported_parent = any(
-                issubclass(type_, parent) for parent in _AVAILABLE_EXTERNAL_SCHEMA_PRODIVERS
-            )
-            return (has_supported_parent or type_ == type(None)) and type_ is not Any  # noqa
+            return type_checker(type_)
+
+    error = ('Resource methods must accept/return either Nothing, '
+             'marshmallow.Schema or pydantic.BaseModel not {}')
 
     try:
         if type_ and not predicate(type_):
@@ -93,22 +117,19 @@ def validate_type_preconditions(type_: Any) -> None:
         raise TypeValidationError(error.format(type_))
 
 
-def validate_method_signature(method: ResourceMethodWithReturnValue, uri_parameters: Set[str]) -> Tuple[Optional[str],
-                                                                                                        Dict]:
+def validate_method_signature(method: ResourceMethodWithReturnValue,
+                              path_parameters_names: Set[str]) -> HTTPMethodAnnotation:
     """
     Validate whether resource method has the right signature.
 
-    :returns: body parameter name and hints
+    :returns: request and response hints.
     """
-    hints = get_type_hints(method)
-    arguments = inspect.getfullargspec(method).args
+    hints, arguments = get_type_hints(method), inspect.getfullargspec(method).args
 
-    for parameter in filter(lambda p: hints.get(p, None) is Any or p not in arguments, uri_parameters):
-        raise TypeValidationError(f'URI parameter {parameter} has type hint Any or is missing from signature')
+    validate_type_preconditions(hints.get('return', None), type_checker=is_supported_response_type)
 
-    validate_type_preconditions(
-        hints.get('return', None)
-    )
+    for parameter in filter(lambda p: hints.get(p, None) is Any or p not in arguments, path_parameters_names):
+        raise TypeValidationError(f'Path parameter {parameter} has type hint Any or is missing from signature')
 
     if len(arguments) < 3:
         raise TypeValidationError('Every resource method must have the first two parameters as '
@@ -120,21 +141,62 @@ def validate_method_signature(method: ResourceMethodWithReturnValue, uri_paramet
     if hints.get(arguments[2], Any) not in [falcon.Response, Any]:
         raise TypeValidationError('Second parameter must be of type falcon.Response')
 
-    body_parameters = set(arguments) - (uri_parameters | set(itertools.islice(arguments, 3)) | set(['return']))
+    non_path_parameters_names: Set[str] = set(arguments) - (path_parameters_names |  # noqa
+                                                            set(itertools.islice(arguments, 3)) | set(['return']))
 
-    if len(body_parameters) > 1 and any(hints.get(parameter) for parameter in body_parameters):
-        raise TypeValidationError('Any resource method can not accept more than one request parameter, that is one'
-                                  'parameter of type marshmallow.Schema or pydantic.BaseModel')
+    path_parameters: List[PathParameter] = []
 
-    for parameter_name in body_parameters:
-        validate_type_preconditions(hints.get(parameter_name, None))
+    for name in filter(hints.get, path_parameters_names):
+        register_type(hints[name])
 
-    return next(iter(body_parameters & set(hints)), None), hints
+        path_parameters.append(PathParameter(hints[name], name=name))
+
+    non_path_parameters: Dict[Union[Type[QueryParameter], Type[BodyParameter]],
+                              Union[QueryParameter, BodyParameter]] = {}
+
+    for name in non_path_parameters_names:
+        hint = hints.get(name, None)
+
+        validate_type_preconditions(hint, type_checker=is_supported_request_type)
+
+        parameter_type: Union[Type[QueryParameter], Type[BodyParameter]]
+
+        if isinstance(hint, QueryParameter) or isinstance(hint, BodyParameter):
+            parameter_type = type(hint)
+
+        else:
+            # This parameter is neither a query or body parameter
+            # We will assume that POST, PUT and PATCH only have bodies and
+            # other methods only have query parameters.
+            #
+            # If the user needs to have methods that accepts both body and request parameters
+            # Query and Body annotations can be used.
+            #
+            # An error will be raised in ambiguous situations nevertheless.
+            if method.__name__.lower() in _HTTP_VERBS_WITH_BODIES:  # type: ignore
+                parameter_type = BodyParameter
+
+            else:
+                parameter_type = QueryParameter
+
+        if parameter_type in non_path_parameters:
+            raise TypeValidationError('There can not be more than one body parameter and one query paremeter. '
+                                      'To specify both a query and a body parameter use Query and Body annotations. '
+                                      'Did you forget to add a path parameter to resource route /{%s} ?' % name)
+
+        non_path_parameters[parameter_type] = parameter_type(hint, name=name)  # type: ignore
+
+    return HTTPMethodAnnotation(path=path_parameters,
+
+                                query=cast(Optional[QueryParameter], non_path_parameters.get(QueryParameter)),
+                                body=cast(Optional[BodyParameter], non_path_parameters.get(BodyParameter)),
+
+                                returns=hints.get('return'))
 
 
-def patch_resource_methods(uri_template: str, resource: Any) -> None:
+def patch_resource_methods(uri_template: str, resource: TypedResource) -> None:
     """Patch resource methods to add type hint supports."""
-    uri_parameters = set(match.group('fname') for match in _FIELD_PATTERN.finditer(uri_template))
+    path_parameters = set(match.group('fname') for match in _FIELD_PATTERN.finditer(uri_template))
 
     def resource_method_wrapper(method: ResourceMethodWithReturnValue) -> ResourceMethodWithoutReturnValue:
         """
@@ -152,25 +214,19 @@ def patch_resource_methods(uri_template: str, resource: Any) -> None:
 
         return curried
 
-    resource.methods_body_parameter = {}
-    resource.hints = {}
-
     for method_name in filter(functools.partial(hasattr, resource), _METHOD_NAMES):
-
         method: ResourceMethodWithReturnValue = getattr(resource, method_name)
 
         if not callable(method):
             raise TypeValidationError(f'{resource}.{method_name} must be a Callable')
 
         try:
-            body_parameter, hints = validate_method_signature(method, uri_parameters=uri_parameters)
+            annotation = validate_method_signature(method, path_parameters_names=path_parameters)
 
-            resource.methods_body_parameter[method_name] = body_parameter
-            resource.hints[method_name] = hints
+            resource._init_annotations()
+            resource._set_method_annotations(method_name, annotation)
 
         except TypeValidationError as e:
             raise TypeValidationError(f'{resource}.{method} raised: {e}')
 
-        wrapped = resource_method_wrapper(method)
-
-        setattr(resource, method_name, wrapped)
+        setattr(resource, method_name, resource_method_wrapper(method))

@@ -1,4 +1,4 @@
-from .base import TypedAPI, TypedResource
+from .base import Body, Query, TypedAPI, TypedResource
 from .middleware import TypingMiddleware
 
-__all__ = ['TypedAPI', 'TypedResource', 'TypingMiddleware']
+__all__ = ['TypedAPI', 'TypedResource', 'TypingMiddleware', 'Query', 'Body']
