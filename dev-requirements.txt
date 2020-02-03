@@ -92,10 +92,6 @@ idna==2.8 \
 importlab==0.5.1 \
     --hash=sha256:d855350d19dc10a17aabd2fe6f4b428ff1a936071f692fbf686a73694d26a51c \
     # via pytype
-importlib-metadata==0.23 \
-    --hash=sha256:aa18d7378b00b40847790e7c27e11673d7fed219354109d0e7b9e5b25dc3ad26 \
-    --hash=sha256:d5f18a79777f3aa179c145737780282e27b508fc8fd688cb17c7a813e8bd39af \
-    # via pluggy, pytest
 isort==4.3.21 \
     --hash=sha256:54da7e92468955c4fceacd0c86bd0ec997b0e1ee80d97f67c35a78b719dccab1 \
     --hash=sha256:6e811fcb295968434526407adb8796944f1988c5b65e8139058f2014cbe100fd
@@ -123,9 +119,9 @@ libcst==0.2.1 \
     --hash=sha256:741c16a7371a0d654a009883acab729987d0ec0927791e5aaa937320c139e67f \
     --hash=sha256:9a030105d95977355c87355f936777fbc5ee872a43effdf52158b190b10ed9ce \
     # via pyre-check
-marshmallow==3.2.1 \
-    --hash=sha256:077b4612f5d3b9333b736fdc6b963d2b46d409070f44ff3e6c4109645c673e83 \
-    --hash=sha256:9a2f3e8ea5f530a9664e882d7d04b58650f46190178b2264c72b7d20399d28f0
+marshmallow==3.4.0 \
+    --hash=sha256:7669b944d6233b81f68739d5826f1176c3841cc31cf6b856841083b5a72f5ca9 \
+    --hash=sha256:c9d277f6092f32300395fb83d343be9f61b5e99d66d22bae1e5e7cd82608fee6
 mccabe==0.6.1 \
     --hash=sha256:ab8a6258860da4b6677da4bd2fe5dc2c659cff31b3ee4f7f5d64e79735b80d42 \
     --hash=sha256:dd8d182285a0fe56bace7f45b5e7d1a6ebcbf524e8f3bd87eb0f125271b8831f \
@@ -133,7 +129,7 @@ mccabe==0.6.1 \
 more-itertools==7.2.0 \
     --hash=sha256:409cd48d4db7052af495b09dec721011634af3753ae1ef92d2b32f73a745f832 \
     --hash=sha256:92b8c4b06dac4f0611c0729b2f2ede52b2e1bac1ab48f089c7ddc12e26bb60c4 \
-    # via pytest, zipp
+    # via pytest
 mypy-extensions==0.4.3 \
     --hash=sha256:090fedd75945a69ae91ce1303b5824f428daf5a028d2f6ab8a299250a846f15d \
     --hash=sha256:2d82818f5bb3e369420cb3c4060a7970edba416647068eb4c5343488a6c604a8 \
@@ -297,7 +293,7 @@ typed-ast==1.4.0 \
     --hash=sha256:d896919306dd0aa22d0132f62a1b78d11aaf4c9fc5b3410d3c666b818191630a \
     --hash=sha256:fdc1c9bbf79510b76408840e009ed65958feba92a88833cdceecff93ae8fff66 \
     --hash=sha256:ffde2fbfad571af120fcbfbbc61c72469e72f550d676c3342492a9dfdefb8f12 \
-    # via astroid, mypy, pytype
+    # via mypy, pytype
 typing-extensions==3.7.4 \
     --hash=sha256:2ed632b30bb54fc3941c382decfd0ee4148f5c591651c9272473fea2c6397d95 \
     --hash=sha256:b1edbbf0652660e32ae780ac9433f4231e7339c7f9a8057d0f042fcbcea49b87 \
@@ -319,7 +315,3 @@ wcwidth==0.1.7 \
 wrapt==1.11.2 \
     --hash=sha256:565a021fd19419476b9362b05eeaa094178de64f8361e44468f9e9d7843901e1 \
     # via astroid
-zipp==0.6.0 \
-    --hash=sha256:3718b1cbcd963c7d4c5511a8240812904164b7f381b647143a89d3b98f9bcd8e \
-    --hash=sha256:f06903e9f1f43b12d371004b4ac7b06ab39a44adc747266928ae6debfa7b3335 \
-    # via importlib-metadata
