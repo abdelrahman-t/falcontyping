@@ -16,8 +16,8 @@ attrs==19.3.0 \
     --hash=sha256:08a96c641c3a74e44eb59afb61a24f2cb9f4d7188748e76ba4bb5edfa3cb7d1c \
     --hash=sha256:f7b7ce16570fe9965acd6d30101a28f62fb4a7f9e926b3bbc9b61f8b04247e72 \
     # via pytest, pytype
-autopep8==1.4.4 \
-    --hash=sha256:4d8eec30cc81bc5617dbf1218201d770dc35629363547f17577c61683ccfb3ee
+autopep8==1.5 \
+    --hash=sha256:0f592a0447acea0c2b0a9602be1e4e3d86db52badd2e3c84f0193bfd89fd3a43
 bandit==1.6.2 \
     --hash=sha256:336620e220cf2d3115877685e264477ff9d9abaeb0afe3dc7264f55fa17a3952 \
     --hash=sha256:41e75315853507aa145d62a78a2a6c5e3240fe14ee7c601459d0df9418196065
